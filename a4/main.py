@@ -1,5 +1,7 @@
 import os
 import warnings
+import sys
+
 
 import hydra
 import numpy as np
@@ -109,11 +111,16 @@ def render_images(
             # We assume the object is placed at the origin
             origin = torch.tensor([0.0, 0.0, 0.0], device=device) 
             light_location = None if lights is None else lights[cam_idx].location.to(device)
+            
+
             if lights is not None:
-                light_dir = None #TODO: Use light location and origin to compute light direction
+                print(f" origin is {origin} and light_location is {light_location}")
+                print(f" size of origin: {origin.shape} and light_location: {light_location.shape}")
+
+                light_dir = light_location - origin #TODO: Use light location and origin to compute light direction
                 light_dir = torch.nn.functional.normalize(light_dir, dim=-1).view(-1, 3)
             xy_grid = get_pixels_from_image(image_size, camera)
-            ray_bundle = get_rays_from_pixels(xy_grid, image_size, camera)
+            ray_bundle = get_rays_from_pixels(xy_grid, image_size, camera, device)
 
             # Run model forward
             out = model(ray_bundle, light_dir)
@@ -450,9 +457,15 @@ def relight_images(cfg):
     imageio.mimsave('images/part_4_geometry.gif', [np.uint8(im * 255) for im in test_images])
 
 
-@hydra.main(config_path='configs', config_name='torus')
+@hydra.main(config_path='configs', config_name='torus', version_base='1.1')
 def main(cfg: DictConfig):
     os.chdir(hydra.utils.get_original_cwd())
+    hydra.job_logging = None
+    hydra.verbose = False
+
+    print(f" ----------------- init -----------------")
+    print(f" cfg.type: {cfg.type}")
+    
 
     if cfg.type == 'render':
         render(cfg)

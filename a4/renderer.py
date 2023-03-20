@@ -1,8 +1,10 @@
 import torch
+import sys
 
 from typing import List, Optional, Tuple
 from pytorch3d.renderer.cameras import CamerasBase
 import pdb
+import copy
 
 from a4.lighting_functions import relighting_dict
 
@@ -36,12 +38,33 @@ class SphereTracingRenderer(torch.nn.Module):
                     the point can be arbitrary.
             mask: N_rays X 1 (boolean tensor) denoting which of the input rays intersect the surface.
         '''
+
+        print(f" ================== inside sphere tracing ==================")
+        print(f" origins size {origins.shape}, directions size {directions.shape}") #torch.Size([8192, 3])
+
+     
         # TODO (Q1): Implement sphere tracing
         # 1) Iteratively update points and distance to the closest surface
         #   in order to compute intersection points of rays with the implicit surface
         # 2) Maintain a mask with the same batch dimension as the ray origins,
         #   indicating which points hit the surface, and which do not
-        pass
+
+        num_rays = origins.shape[0]
+
+        points = copy.deepcopy(origins)
+
+        # iteratively update pts
+        for i in range(self.max_iters):
+            # get points using SDF implicit function(points)
+            sdf = implicit_fn(points)
+            # print(f"size of points, sdf, directions: {points.shape}, {sdf.shape}, {directions.shape}")
+            points = points + sdf * directions
+            # print(f"size of points after update: {points.shape}")
+
+        # get mask
+        mask = sdf < 0.0001
+
+        return points, mask
 
     def forward(
         self,
