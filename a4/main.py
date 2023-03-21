@@ -114,8 +114,8 @@ def render_images(
             
 
             if lights is not None:
-                print(f" origin is {origin} and light_location is {light_location}")
-                print(f" size of origin: {origin.shape} and light_location: {light_location.shape}")
+                # print(f" origin is {origin} and light_location is {light_location}")
+                # print(f" size of origin: {origin.shape} and light_location: {light_location.shape}")
 
                 light_dir = light_location - origin #TODO: Use light location and origin to compute light direction
                 light_dir = torch.nn.functional.normalize(light_dir, dim=-1).view(-1, 3)
@@ -233,7 +233,10 @@ def train_points(
 
     # Run the main training loop.
     for epoch in range(0, cfg.training.num_epochs):
-        t_range = tqdm.tqdm(range(0, all_points.shape[0], cfg.training.batch_size))
+        # t_range = tqdm.tqdm(range(0, all_points.shape[0], cfg.training.batch_size))
+        t_range = range(0, all_points.shape[0], cfg.training.batch_size)
+
+
 
         for idx in t_range:
             # Select random points from pointcloud
@@ -241,8 +244,10 @@ def train_points(
 
             # Get distances and enforce point cloud loss
             distances, gradients = model.implicit_fn.get_distance_and_gradient(points)
-            loss = None # TODO (Q2): Point cloud SDF loss on distances
-            point_loss = loss
+            
+            loss = torch.nn.functional.mse_loss( distances, torch.zeros_like(distances) ) # TODO (Q2): Point cloud SDF loss on distances
+            # point_loss = loss
+            # print(f"Point loss: {point_loss}")
 
             # Sample random points in bounding box
             eikonal_points = get_random_points(
@@ -253,14 +258,15 @@ def train_points(
             eikonal_distances, eikonal_gradients = model.implicit_fn.get_distance_and_gradient(eikonal_points)
             loss += torch.exp(-1e2 * torch.abs(eikonal_distances)).mean() * cfg.training.inter_weight
             loss += eikonal_loss(eikonal_gradients) * cfg.training.eikonal_weight # TODO (Q2): Implement eikonal loss
+            # print(f"Eikonal loss: {loss:.03f}")
 
             # Take the training step.
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            t_range.set_description(f'Epoch: {epoch:04d}, Loss: {point_loss:.06f}')
-            t_range.refresh()
+            # t_range.set_description(f'Epoch: {epoch:04d}, Loss: {point_loss}')
+            # t_range.refresh()
 
         # Checkpoint.
         if (

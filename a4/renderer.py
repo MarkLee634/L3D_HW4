@@ -39,8 +39,8 @@ class SphereTracingRenderer(torch.nn.Module):
             mask: N_rays X 1 (boolean tensor) denoting which of the input rays intersect the surface.
         '''
 
-        print(f" ================== inside sphere tracing ==================")
-        print(f" origins size {origins.shape}, directions size {directions.shape}") #torch.Size([8192, 3])
+        # print(f" ================== inside sphere tracing ==================")
+        # print(f" origins size {origins.shape}, directions size {directions.shape}") #torch.Size([8192, 3])
 
      
         # TODO (Q1): Implement sphere tracing

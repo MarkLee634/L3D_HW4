@@ -232,6 +232,66 @@ class NeuralSurface(torch.nn.Module):
     ):
         super().__init__()
         # TODO (Q2): Implement Neural Surface MLP to output per-point SDF
+
+        # implicit_function:
+        #     type: neural_surface
+
+        #     n_harmonic_functions_xyz: 4
+
+        #     n_layers_distance: 6
+        #     n_hidden_neurons_distance: 128
+
+
+        #     n_layers_color: 2
+        #     n_hidden_neurons_color: 128
+
+        self.harmonic_embedding_xyz = HarmonicEmbedding(3, cfg.n_harmonic_functions_xyz)
+        input_dim = self.harmonic_embedding_xyz.output_dim
+
+
+        MLP_shared_layers = []
+        MLP_color_layers = []
+        MLP_distance_layers = []
+
+        # shared block
+        for n_layer in range(cfg.n_layers_distance):
+            #FC
+            MLP_shared_layers.append(torch.nn.Linear(input_dim, cfg.n_hidden_neurons_distance))
+
+            #RELU
+            MLP_shared_layers.append(torch.nn.ReLU())
+
+            #set a new input dim
+            input_dim = cfg.n_hidden_neurons_distance
+
+        # distance block
+        # 1 FC layer with no activation
+        MLP_distance_layers.append(torch.nn.Linear(input_dim, 1))
+
+        # color block
+        for n_layer in range(cfg.n_layers_color):
+            #FC
+            MLP_color_layers.append(torch.nn.Linear(input_dim, cfg.n_hidden_neurons_color))
+
+            #RELU
+            MLP_color_layers.append(torch.nn.ReLU())
+
+            #set a new input dim
+            input_dim = cfg.n_hidden_neurons_color
+
+        #color block final layer {FC activation + sigmoid to get a value between 0 and 1}
+        MLP_color_layers.append(torch.nn.Linear(input_dim, 3))
+        MLP_color_layers.append(torch.nn.Sigmoid())
+
+        #set the layers
+        self.MLP_shared_layers = torch.nn.Sequential(*MLP_shared_layers)
+        self.MLP_distance_layers = torch.nn.Sequential(*MLP_distance_layers)
+        self.MLP_color_layers = torch.nn.Sequential(*MLP_color_layers)
+
+
+
+        # ============================================================
+
         # TODO (Q3): Implement Neural Surface MLP to output per-point color
 
     def get_distance(
@@ -244,8 +304,14 @@ class NeuralSurface(torch.nn.Module):
             distance: N X 1 Tensor, where N is number of input points
         '''
         points = points.view(-1, 3)
-        pass
-    
+
+        position_embedding = self.harmonic_embedding_xyz(points)
+        features = self.MLP_shared_layers(position_embedding)
+        distance = self.MLP_distance_layers(features)
+
+        return distance
+
+        
     def get_color(
         self,
         points
