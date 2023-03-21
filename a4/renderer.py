@@ -114,7 +114,14 @@ class SphereTracingRenderer(torch.nn.Module):
 
 def sdf_to_density(signed_distance, alpha, beta):
     # TODO (Q3): Convert signed distance to density with alpha, beta parameters
-    pass
+    
+    # Laplacian distribution with zero mean and beta scale
+    laplacian_distribution = torch.distributions.laplace.Laplace(0, beta)
+
+    # CDF of the Laplacian distribution
+    density = alpha * laplacian_distribution.cdf(-1 * signed_distance)
+
+    return density
 
 class VolumeSDFRenderer(torch.nn.Module):
     def __init__(
@@ -137,7 +144,27 @@ class VolumeSDFRenderer(torch.nn.Module):
         eps: float = 1e-10
     ):
         # TODO (Q3): Copy code from VolumeRenderer._compute_weights
-        pass
+
+        #  Note that for the first segment T = 1
+        num_rays = rays_density.shape[0]
+        num_samples = rays_density.shape[1]
+
+        T_prev = torch.ones(num_rays, 1).cuda()
+  
+
+        T = []
+        for i in range(num_samples):
+            T_curr = T_prev * torch.exp(-rays_density[:, i] * deltas[:, i])
+            T.append(T_curr)
+            T_prev = T_curr
+
+        T = torch.stack(T, dim=1)
+        transmittance = (1 - torch.exp(-rays_density * deltas + eps))
+        # print(f"shape of T {T.shape}, transmittance {transmittance.shape}")
+        weights = T * transmittance
+
+        return weights
+
     
     def _aggregate(
         self,
@@ -145,7 +172,17 @@ class VolumeSDFRenderer(torch.nn.Module):
         rays_color: torch.Tensor
     ):
         # TODO (Q3): Copy code from VolumeRenderer._aggregate
-        pass
+        chunk_size = weights.shape[0]
+        num_samples = weights.shape[1]
+
+        rays_feature_reshape = rays_color.view(chunk_size, num_samples, -1)
+        rays_feature_reshape = rays_color.squeeze(2)
+
+        # print(f"rays_feature_reshape shape: {rays_feature_reshape.shape}, weights shape: {weights.shape}")
+
+        feature = torch.sum(weights * rays_feature_reshape, dim=1 )
+
+        return feature
 
     def forward(
         self,
@@ -168,7 +205,7 @@ class VolumeSDFRenderer(torch.nn.Module):
 
             # Call implicit function with sample points
             distance, color = implicit_fn.get_distance_color(cur_ray_bundle.sample_points)
-            density = None # TODO (Q3): convert SDF to density
+            density = sdf_to_density(distance, self.alpha, self.beta) # TODO (Q3): convert SDF to density
 
             # Compute length of each ray segment
             depth_values = cur_ray_bundle.sample_lengths[..., 0]

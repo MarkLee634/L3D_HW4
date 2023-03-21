@@ -348,6 +348,8 @@ def train_images(
     # Pretrain SDF
     pretrain_sdf(cfg, model)
 
+    device = list(model.parameters())[0].device
+
     # Run the main training loop.
     for epoch in range(start_epoch, cfg.training.num_epochs):
         t_range = tqdm.tqdm(enumerate(train_dataloader))
@@ -362,7 +364,7 @@ def train_images(
                 cfg.training.batch_size, cfg.data.image_size, camera
             )
             ray_bundle = get_rays_from_pixels(
-                xy_grid, cfg.data.image_size, camera
+                xy_grid, cfg.data.image_size, camera, device
             )
             rgb_gt = sample_images_at_xy(image, xy_grid)
 
